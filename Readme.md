@@ -27,21 +27,97 @@ own initiator on the same PC. The additions are:
 
 Building from source
 --------------------
-No Visual Studio and no system-wide installs are required. All you need is
-Windows 10/11 x64 and an internet connection on the first run.
+The repository ships a build script that downloads its own toolchain, so no
+Visual Studio, no .NET SDK installation and no changes to `PATH` are needed.
 
-1. Run `build.cmd` (or `powershell -NoProfile -File build.ps1`).
-2. The script downloads the .NET SDK and ILMerge into `.tools\`, restores the
-   NuGet packages into `.tools\nuget-packages`, builds the target framework and
-   merges the assemblies into `dist\ISCSIConsole.exe`.
-3. Unless `-NoPackage` is passed, it also writes
-   `dist\ISCSIConsole_<version>_<tfm>.zip` with a blank settings file and prints
-   the SHA256 of the archive.
+### Requirements
 
-Options: `-TargetFramework net20|net40|net472` (default `net472`, the only one
-tested), `-Clean`, `-SdkVersion`, `-IlMergeVersion`, `-NoPackage`. Nothing is
-installed outside the repository and PATH is not modified; deleting `.tools\`
-removes the toolchain completely.
+* Windows 10 or 11, x64.
+* Windows PowerShell 5.1 (installed by default).
+* An internet connection on the first run: the script downloads the .NET SDK
+  and ILMerge, then restores the NuGet packages.
+* About 1 GB of free space inside the repository for `.tools\`.
+
+### Quick start
+
+1. Get the sources, either with `git clone` or "Code → Download ZIP" on GitHub.
+2. Open a command prompt in the repository root and run:
+
+   ```
+   build.cmd
+   ```
+
+   From PowerShell you can call the script directly:
+
+   ```
+   powershell -NoProfile -File build.ps1
+   ```
+
+3. When it finishes, the results are in `dist\`:
+
+   | File | Description |
+   | --- | --- |
+   | `dist\ISCSIConsole.exe` | Single merged executable, no DLLs needed next to it. |
+   | `dist\ISCSIConsole_<version>_<tfm>.zip` | Distributable archive with a blank `ISCSIConsole.settings.ini`. |
+
+   The script prints the SHA256 of the archive at the end.
+
+The first run takes a few minutes because of the downloads; later runs reuse
+`.tools\` and only compile.
+
+### What the script does
+
+1. Resolves the latest .NET SDK of the 8.0 channel from the official release
+   metadata, downloads it and verifies its SHA-512.
+2. Downloads the ILMerge NuGet package (3.0.41 by default).
+3. Restores the NuGet packages into `.tools\nuget-packages` with the
+   repository's `NuGet.config`.
+4. Builds `ISCSIConsole\ISCSIConsole.csproj` for `net472` (Release).
+5. Merges `ISCSIConsole.exe` with `ISCSI.dll`, `Utilities.dll`,
+   `DiskAccessLibrary.dll` and `DiskAccessLibrary.Win32.dll` via ILMerge.
+6. Unless `-NoPackage` is used, stages the merged exe plus the blank settings
+   file and creates the zip.
+
+Everything the script downloads lives in `.tools\`, which is ignored by git;
+deleting that folder removes the toolchain completely.
+
+### Options
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `-TargetFramework` | `net472` | Target framework to build. `net20`, `net40` and `net472` are accepted; only `net472` is tested. |
+| `-Configuration` | `Release` | Build configuration. |
+| `-Clean` | off | Cleans previous build outputs and `dist\` before building. |
+| `-NoPackage` | off | Skips the zip, only produces `dist\ISCSIConsole.exe`. |
+| `-SdkVersion` | latest of the channel | Pins an exact .NET SDK version, e.g. `-SdkVersion 8.0.427`. |
+| `-SdkChannel` | `8.0` | Release channel used to resolve the SDK. |
+| `-IlMergeVersion` | `3.0.41` | ILMerge version downloaded from NuGet. |
+
+Examples:
+
+```
+build.cmd -Clean
+build.cmd -NoPackage
+build.cmd -TargetFramework net472 -SdkVersion 8.0.427
+```
+
+### Troubleshooting
+
+* **Script blocked by the execution policy**: the default policy of some
+  machines refuses local scripts. Use the `build.cmd` wrapper, or allow local
+  scripts for your user with
+  `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (no administrator
+  rights required).
+* **NuGet restore errors**: the build needs `nuget.org`; the repository's
+  `NuGet.config` clears inherited sources on purpose, so a custom global
+  configuration cannot break the restore.
+* **Corrupted toolchain**: delete `.tools\` and run the script again; the
+  downloads are verified and repeated from scratch.
+* **The script fails extracting the SDK**: it uses the `tar.exe` shipped with
+  Windows (`%SystemRoot%\System32\tar.exe`). If that file is missing, it falls
+  back to PowerShell's `Expand-Archive`.
+* **Build fails only for `net20`/`net40`**: those targets are inherited from
+  upstream and are not tested here; use `net472`.
 
 Requirements: Windows, .NET Framework 4.7.2 and PowerShell 5.1 with the iSCSI
 and Storage modules. Only the net472 target is built and tested here. The
