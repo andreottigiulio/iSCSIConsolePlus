@@ -1,0 +1,8 @@
+<Project>
+
+  <!-- Allows building the .NET Framework targets with the .NET SDK alone, without Visual Studio or the targeting packs installed. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

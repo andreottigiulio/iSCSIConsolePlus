@@ -25,6 +25,24 @@ own initiator on the same PC. The additions are:
   (persisted as `MinimizeToTray`); the tray menu can reopen or close the app.
 * A "Dynamically expanding" checkbox in Create Virtual Disk.
 
+Building from source
+--------------------
+No Visual Studio and no system-wide installs are required. All you need is
+Windows 10/11 x64 and an internet connection on the first run.
+
+1. Run `build.cmd` (or `powershell -NoProfile -File build.ps1`).
+2. The script downloads the .NET SDK and ILMerge into `.tools\`, restores the
+   NuGet packages into `.tools\nuget-packages`, builds the target framework and
+   merges the assemblies into `dist\ISCSIConsole.exe`.
+3. Unless `-NoPackage` is passed, it also writes
+   `dist\ISCSIConsole_<version>_<tfm>.zip` with a blank settings file and prints
+   the SHA256 of the archive.
+
+Options: `-TargetFramework net20|net40|net472` (default `net472`, the only one
+tested), `-Clean`, `-SdkVersion`, `-IlMergeVersion`, `-NoPackage`. Nothing is
+installed outside the repository and PATH is not modified; deleting `.tools\`
+removes the toolchain completely.
+
 Requirements: Windows, .NET Framework 4.7.2 and PowerShell 5.1 with the iSCSI
 and Storage modules. Only the net472 target is built and tested here. The
 implementation was made with AI assistance; design and testing were done by the
