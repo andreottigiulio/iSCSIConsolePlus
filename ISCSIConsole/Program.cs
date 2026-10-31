@@ -24,38 +24,64 @@ namespace ISCSIConsole
             Application.ThreadException += new ThreadExceptionEventHandler(Application_ThreadException);
             AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
 
-            if (args.Length > 0)
+            CommandLineOptions options = CommandLineOptions.Parse(args);
+
+            if (options.ShowHelp)
             {
-                if (args[0] == "/help")
+                MessageBox.Show(CommandLineOptions.GetUsage(), "iSCSI Console");
+                return;
+            }
+
+            if (options.LogToFile)
+            {
+                string path = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                if (!path.EndsWith(@"\"))
                 {
-                    
+                    path += @"\";
                 }
-                if (args[0] == "/log")
+                path += String.Format("Log {0}.txt", DateTime.Now.ToString("yyyy-MM-dd HH-mm"));
+                bool success = OpenLogFile(path);
+                if (!success)
                 {
-                    string path = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-                    if (!path.EndsWith(@"\"))
-                    {
-                        path += @"\";
-                    }
-                    path += String.Format("Log {0}.txt", DateTime.Now.ToString("yyyy-MM-dd HH-mm"));
-                    bool success = OpenLogFile(path);
-                    if (!success)
-                    {
-                        MessageBox.Show("Cannot open log file", "Error");
-                    }
-                }
-                else
-                {
-                    StringBuilder builder = new StringBuilder();
-                    builder.AppendLine("Command line arguments:");
-                    builder.AppendLine("/log - will write log file to executable directory");
-                    MessageBox.Show(builder.ToString(), "Error");
-                    return;
+                    MessageBox.Show("Cannot open log file", "Error");
                 }
             }
+
+            if (options.Error != null)
+            {
+                MessageBox.Show(options.Error + Environment.NewLine + Environment.NewLine + CommandLineOptions.GetUsage(), "Error");
+                return;
+            }
+
+            if (!String.IsNullOrEmpty(options.HeadlessAction))
+            {
+                RunHeadless(options);
+                return;
+            }
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            Application.Run(new MainForm(options));
+        }
+
+        /// <summary>
+        /// Runs an elevated operation (iSCSI initiator / disk management) without any UI,
+        /// writing a report that the non-elevated instance can display.
+        /// </summary>
+        private static void RunHeadless(CommandLineOptions options)
+        {
+            Reporter reporter = new Reporter(options.ReportPath);
+            int exitCode = 1;
+            try
+            {
+                exitCode = HeadlessActions.Run(options.HeadlessAction, AppSettings.Load(), reporter);
+            }
+            catch (Exception ex)
+            {
+                reporter.Write("UNEXPECTED ERROR: " + ex.GetType() + ": " + ex.Message);
+                reporter.Write("RESULT: FAILED");
+            }
+            Environment.ExitCode = exitCode;
         }
 
         public static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)

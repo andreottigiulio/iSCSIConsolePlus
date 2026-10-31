@@ -36,6 +36,7 @@ namespace ISCSIConsole
             this.lblFilePath = new System.Windows.Forms.Label();
             this.txtFilePath = new System.Windows.Forms.TextBox();
             this.btnBrowse = new System.Windows.Forms.Button();
+            this.chkDynamic = new System.Windows.Forms.CheckBox();
             this.btnOK = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numericDiskSize)).BeginInit();
@@ -113,12 +114,22 @@ namespace ISCSIConsole
             this.btnBrowse.UseVisualStyleBackColor = true;
             this.btnBrowse.Click += new System.EventHandler(this.btnBrowse_Click);
             // 
+            // chkDynamic
+            // 
+            this.chkDynamic.AutoSize = true;
+            this.chkDynamic.Location = new System.Drawing.Point(186, 42);
+            this.chkDynamic.Name = "chkDynamic";
+            this.chkDynamic.Size = new System.Drawing.Size(139, 17);
+            this.chkDynamic.TabIndex = 6;
+            this.chkDynamic.Text = "Dynamically expanding";
+            this.chkDynamic.UseVisualStyleBackColor = true;
+            // 
             // btnOK
             // 
             this.btnOK.Location = new System.Drawing.Point(224, 88);
             this.btnOK.Name = "btnOK";
             this.btnOK.Size = new System.Drawing.Size(75, 23);
-            this.btnOK.TabIndex = 6;
+            this.btnOK.TabIndex = 7;
             this.btnOK.Text = "OK";
             this.btnOK.UseVisualStyleBackColor = true;
             this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
@@ -129,7 +140,7 @@ namespace ISCSIConsole
             this.btnCancel.Location = new System.Drawing.Point(305, 88);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(75, 23);
-            this.btnCancel.TabIndex = 7;
+            this.btnCancel.TabIndex = 8;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
@@ -142,6 +153,7 @@ namespace ISCSIConsole
             this.ClientSize = new System.Drawing.Size(394, 125);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnOK);
+            this.Controls.Add(this.chkDynamic);
             this.Controls.Add(this.btnBrowse);
             this.Controls.Add(this.txtFilePath);
             this.Controls.Add(this.lblFilePath);
@@ -172,6 +184,7 @@ namespace ISCSIConsole
         private System.Windows.Forms.Label lblFilePath;
         private System.Windows.Forms.TextBox txtFilePath;
         private System.Windows.Forms.Button btnBrowse;
+        private System.Windows.Forms.CheckBox chkDynamic;
         private System.Windows.Forms.Button btnOK;
         private System.Windows.Forms.Button btnCancel;
     }

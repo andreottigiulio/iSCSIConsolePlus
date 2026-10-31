@@ -14,10 +14,12 @@ namespace ISCSIConsole
     {
         private DiskImage m_diskImage;
         private bool m_isWorking = false;
+        private ToolTip m_toolTip = new ToolTip();
 
         public CreateDiskImageForm()
         {
             InitializeComponent();
+            m_toolTip.SetToolTip(chkDynamic, "Dynamic disks start small and grow as data is written. Fixed disks allocate the full size immediately and are usually faster.");
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
@@ -30,6 +32,7 @@ namespace ISCSIConsole
         {
             string path = txtFilePath.Text;
             long size = (long)numericDiskSize.Value * 1024 * 1024;
+            bool dynamic = chkDynamic.Checked;
             if (path == String.Empty)
             {
                 MessageBox.Show("Please choose file location", "Error");
@@ -41,7 +44,7 @@ namespace ISCSIConsole
                 DiskImage diskImage;
                 try
                 {
-                    diskImage = VirtualHardDisk.CreateFixedDisk(path, size);
+                    diskImage = dynamic ? VirtualHardDisk.CreateDynamicDisk(path, size) : VirtualHardDisk.CreateFixedDisk(path, size);
                 }
                 catch (IOException ex)
                 {
@@ -51,6 +54,7 @@ namespace ISCSIConsole
                         txtFilePath.Enabled = true;
                         btnBrowse.Enabled = true;
                         numericDiskSize.Enabled = true;
+                        chkDynamic.Enabled = true;
                         btnOK.Enabled = true;
                         btnCancel.Enabled = true;
                     });
@@ -66,6 +70,7 @@ namespace ISCSIConsole
                         txtFilePath.Enabled = true;
                         btnBrowse.Enabled = true;
                         numericDiskSize.Enabled = true;
+                        chkDynamic.Enabled = true;
                         btnOK.Enabled = true;
                         btnCancel.Enabled = true;
                     });
@@ -83,6 +88,7 @@ namespace ISCSIConsole
             txtFilePath.Enabled = false;
             btnBrowse.Enabled = false;
             numericDiskSize.Enabled = false;
+            chkDynamic.Enabled = false;
             btnOK.Enabled = false;
             btnCancel.Enabled = false;
         }

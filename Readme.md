@@ -1,3 +1,42 @@
+iSCSIConsolePlus (unofficial fork)
+==================================
+
+This is a personal, unofficial fork of
+[Tal Aloni's iSCSI Console](https://github.com/TalAloni/iSCSIConsole), built on
+his iSCSI library. It is not affiliated with, endorsed by, or supported by the
+original author.
+
+It adds support for one specific loopback scenario: a VHD stored on an SMB share
+of a NAS without iSCSI support, exported on 127.0.0.1 and consumed by Windows'
+own initiator on the same PC. The additions are:
+
+* Persistent settings (portable `ISCSIConsole.settings.ini`, fallback to
+  `%APPDATA%\iSCSIConsole`) and a command line (`/vhd`, `/iqn`, `/listen`,
+  `/portal`, `/port`, `/setup`, `/save`, `/headless ...`).
+* Two tabs, Target (Server) and Windows Initiator (Client), with two independent
+  auto-starts: a Startup shortcut for the target and a highest-privilege logon
+  task for the initiator.
+* A short-lived elevated helper for MSiSCSI and disk operations, while the
+  process serving the VHD stays non-elevated (an elevated token cannot see the
+  user's SMB session).
+* Connect, mount, disconnect/unmount with size-matched disk selection, and a
+  button that opens `iscsicpl.exe`.
+* A notification-area icon with an optional "minimize to tray on close" mode
+  (persisted as `MinimizeToTray`); the tray menu can reopen or close the app.
+* A "Dynamically expanding" checkbox in Create Virtual Disk.
+
+Requirements: Windows, .NET Framework 4.7.2 and PowerShell 5.1 with the iSCSI
+and Storage modules. Only the net472 target is built and tested here. The
+implementation was made with AI assistance; design and testing were done by the
+repository owner.
+
+License: LGPL v3, same as the original project (see `License.txt`). Original
+copyright notices are kept. If you redistribute binaries, provide the
+corresponding source as the license requires.
+
+The original project remains the reference for the target-only demo; this fork
+exists because these additions were out of scope there.
+
 About iSCSI Console:
 ====================
 iSCSI Console is a Free, Open Source, User-Mode iSCSI Target Server written in C#.  
