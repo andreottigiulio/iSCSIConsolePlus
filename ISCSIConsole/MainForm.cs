@@ -1055,6 +1055,7 @@ namespace ISCSIConsole
             if (!m_settings.ClosePromptAnswered)
             {
                 CloseActionDialog dialog = new CloseActionDialog();
+                dialog.Icon = this.Icon;
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                 {
                     e.Cancel = true;
