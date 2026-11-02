@@ -963,7 +963,12 @@ namespace ISCSIConsole
                 return;
             }
             m_settings.AutoStart = chkRestoreConfiguration.Checked;
-            m_settings.MinimizeToTray = chkMinimizeToTray.Checked;
+            if (m_settings.MinimizeToTray != chkMinimizeToTray.Checked)
+            {
+                // Changing the option by hand counts as an answer to the close prompt.
+                m_settings.MinimizeToTray = chkMinimizeToTray.Checked;
+                m_settings.ClosePromptAnswered = true;
+            }
             SaveConfiguration();
             UpdateAutoStartStateLabels();
         }
@@ -1042,7 +1047,39 @@ namespace ISCSIConsole
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             SaveConfiguration();
-            if (!m_exitRequested && m_settings.MinimizeToTray && e.CloseReason == CloseReason.UserClosing)
+            if (m_exitRequested || e.CloseReason != CloseReason.UserClosing)
+            {
+                return;
+            }
+
+            if (!m_settings.ClosePromptAnswered)
+            {
+                CloseActionDialog dialog = new CloseActionDialog();
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (dialog.RememberChoice)
+                {
+                    m_settings.MinimizeToTray = dialog.MinimizeToTray;
+                    m_settings.ClosePromptAnswered = true;
+                    m_loading = true;
+                    chkMinimizeToTray.Checked = m_settings.MinimizeToTray;
+                    m_loading = false;
+                    SaveConfiguration();
+                }
+
+                if (dialog.MinimizeToTray)
+                {
+                    e.Cancel = true;
+                    HideToTray();
+                }
+                return;
+            }
+
+            if (m_settings.MinimizeToTray)
             {
                 e.Cancel = true;
                 HideToTray();

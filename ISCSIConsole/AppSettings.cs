@@ -36,6 +36,7 @@ namespace ISCSIConsole
         public string DriveLetter = String.Empty;
         public bool ScheduledTaskInstalled = false;
         public bool MinimizeToTray = false;
+        public bool ClosePromptAnswered = false;
 
         public static string PortableSettingsPath
         {
@@ -149,6 +150,7 @@ namespace ISCSIConsole
             builder.AppendLine("DriveLetter=" + DriveLetter);
             builder.AppendLine("ScheduledTaskInstalled=" + BoolToString(ScheduledTaskInstalled));
             builder.AppendLine("MinimizeToTray=" + BoolToString(MinimizeToTray));
+            builder.AppendLine("ClosePromptAnswered=" + BoolToString(ClosePromptAnswered));
             File.WriteAllText(path, builder.ToString(), Encoding.UTF8);
         }
 
@@ -216,6 +218,9 @@ namespace ISCSIConsole
                     break;
                 case "minimizetotray":
                     MinimizeToTray = StringToBool(value);
+                    break;
+                case "closepromptanswered":
+                    ClosePromptAnswered = StringToBool(value);
                     break;
             }
         }
