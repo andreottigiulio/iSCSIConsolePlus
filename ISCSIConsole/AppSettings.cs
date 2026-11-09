@@ -21,6 +21,9 @@ namespace ISCSIConsole
     public class AppSettings
     {
         public const string SettingsFileName = "ISCSIConsole.settings.ini";
+        public const int MinRestoreRetrySeconds = 1;
+        public const int MaxRestoreRetrySeconds = 3600;
+        public const int DefaultRestoreRetrySeconds = 10;
 
         public string DiskImagePath = String.Empty;
         public string TargetIQN = String.Empty;
@@ -37,6 +40,8 @@ namespace ISCSIConsole
         public bool ScheduledTaskInstalled = false;
         public bool MinimizeToTray = false;
         public bool ClosePromptAnswered = false;
+        public bool RestoreRetry = true;
+        public int RestoreRetrySeconds = DefaultRestoreRetrySeconds;
 
         public static string PortableSettingsPath
         {
@@ -151,6 +156,8 @@ namespace ISCSIConsole
             builder.AppendLine("ScheduledTaskInstalled=" + BoolToString(ScheduledTaskInstalled));
             builder.AppendLine("MinimizeToTray=" + BoolToString(MinimizeToTray));
             builder.AppendLine("ClosePromptAnswered=" + BoolToString(ClosePromptAnswered));
+            builder.AppendLine("RestoreRetry=" + BoolToString(RestoreRetry));
+            builder.AppendLine("RestoreRetrySeconds=" + RestoreRetrySeconds.ToString(CultureInfo.InvariantCulture));
             File.WriteAllText(path, builder.ToString(), Encoding.UTF8);
         }
 
@@ -222,7 +229,30 @@ namespace ISCSIConsole
                 case "closepromptanswered":
                     ClosePromptAnswered = StringToBool(value);
                     break;
+                case "restoreretry":
+                    RestoreRetry = StringToBool(value);
+                    break;
+                case "restoreretryseconds":
+                    int seconds;
+                    if (Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out seconds))
+                    {
+                        RestoreRetrySeconds = ClampRestoreRetrySeconds(seconds);
+                    }
+                    break;
             }
+        }
+
+        public static int ClampRestoreRetrySeconds(int value)
+        {
+            if (value < MinRestoreRetrySeconds)
+            {
+                return MinRestoreRetrySeconds;
+            }
+            if (value > MaxRestoreRetrySeconds)
+            {
+                return MaxRestoreRetrySeconds;
+            }
+            return value;
         }
 
         public static string BoolToString(bool value)

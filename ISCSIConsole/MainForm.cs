@@ -57,6 +57,11 @@ namespace ISCSIConsole
         private Button btnOpenIscsiPanel;
         private Button btnRemoveInitiatorAutoStart;
         private CheckBox chkMinimizeToTray;
+        private CheckBox chkRestoreRetry;
+        private NumericUpDown numRestoreRetrySeconds;
+        private ManualResetEvent m_restoreCancel;
+        private bool m_restoring = false;
+        private int m_restoreAttempt = 0;
         private NotifyIcon m_trayIcon;
         private ContextMenuStrip m_trayMenu;
         private bool m_exitRequested = false;
@@ -110,7 +115,14 @@ namespace ISCSIConsole
         {
             if (m_settings.AutoStart && !String.IsNullOrEmpty(m_settings.DiskImagePath))
             {
-                RestoreConfiguration();
+                if (m_options.Setup)
+                {
+                    RestoreConfigurationBlocking();
+                }
+                else
+                {
+                    RestoreConfiguration();
+                }
             }
 
             UpdateInitiatorSummary();
@@ -130,16 +142,16 @@ namespace ISCSIConsole
         {
             this.SuspendLayout();
 
-            this.ClientSize = new Size(506, 386);
-            this.MinimumSize = new Size(512, 411);
-            this.MaximumSize = new Size(512, 411);
+            this.ClientSize = new Size(506, 416);
+            this.MinimumSize = new Size(512, 441);
+            this.MaximumSize = new Size(512, 441);
             this.AcceptButton = null;
-            this.statusStrip1.Location = new Point(0, 364);
+            this.statusStrip1.Location = new Point(0, 394);
             this.statusStrip1.Size = new Size(506, 22);
 
             tabMain = new TabControl();
             tabMain.Location = new Point(8, 8);
-            tabMain.Size = new Size(490, 356);
+            tabMain.Size = new Size(490, 386);
             tabMain.TabIndex = 0;
 
             tabTarget = new TabPage("Target (Server)");
@@ -163,7 +175,7 @@ namespace ISCSIConsole
             grpTargetAutoStart = new GroupBox();
             grpTargetAutoStart.Text = "Target auto-start";
             grpTargetAutoStart.Location = new Point(8, 164);
-            grpTargetAutoStart.Size = new Size(470, 124);
+            grpTargetAutoStart.Size = new Size(470, 148);
 
             chkRestoreConfiguration = new CheckBox();
             chkRestoreConfiguration.Text = "Restore this target and start the server when iSCSI Console starts";
@@ -171,31 +183,59 @@ namespace ISCSIConsole
             chkRestoreConfiguration.Size = new Size(442, 17);
             chkRestoreConfiguration.CheckedChanged += new EventHandler(OnTargetOptionsChanged);
 
+            chkRestoreRetry = new CheckBox();
+            chkRestoreRetry.Text = "Retry if the target is unavailable";
+            chkRestoreRetry.Location = new Point(14, 44);
+            chkRestoreRetry.Size = new Size(220, 17);
+            chkRestoreRetry.CheckedChanged += new EventHandler(OnTargetOptionsChanged);
+
+            Label lblRetryEvery = new Label();
+            lblRetryEvery.Location = new Point(236, 46);
+            lblRetryEvery.Size = new Size(36, 16);
+            lblRetryEvery.Text = "every";
+
+            numRestoreRetrySeconds = new NumericUpDown();
+            numRestoreRetrySeconds.Location = new Point(274, 42);
+            numRestoreRetrySeconds.Size = new Size(56, 20);
+            numRestoreRetrySeconds.Minimum = AppSettings.MinRestoreRetrySeconds;
+            numRestoreRetrySeconds.Maximum = AppSettings.MaxRestoreRetrySeconds;
+            numRestoreRetrySeconds.Value = AppSettings.DefaultRestoreRetrySeconds;
+            numRestoreRetrySeconds.ValueChanged += new EventHandler(OnTargetOptionsChanged);
+
+            Label lblRetrySeconds = new Label();
+            lblRetrySeconds.Location = new Point(334, 46);
+            lblRetrySeconds.Size = new Size(120, 16);
+            lblRetrySeconds.Text = "seconds";
+
             btnEnableTargetAutoStart = new Button();
             btnEnableTargetAutoStart.Text = "Enable target auto-start";
-            btnEnableTargetAutoStart.Location = new Point(14, 50);
+            btnEnableTargetAutoStart.Location = new Point(14, 68);
             btnEnableTargetAutoStart.Size = new Size(150, 23);
             btnEnableTargetAutoStart.Click += new EventHandler(btnEnableTargetAutoStart_Click);
 
             btnRemoveTargetAutoStart = new Button();
             btnRemoveTargetAutoStart.Text = "Remove target auto-start";
-            btnRemoveTargetAutoStart.Location = new Point(172, 50);
+            btnRemoveTargetAutoStart.Location = new Point(172, 68);
             btnRemoveTargetAutoStart.Size = new Size(150, 23);
             btnRemoveTargetAutoStart.Click += new EventHandler(btnRemoveTargetAutoStart_Click);
 
             lblTargetAutoStartState = new Label();
-            lblTargetAutoStartState.Location = new Point(14, 80);
+            lblTargetAutoStartState.Location = new Point(14, 100);
             lblTargetAutoStartState.Size = new Size(442, 16);
             lblTargetAutoStartState.AutoEllipsis = true;
             lblTargetAutoStartState.Text = "Windows logon: disabled.";
 
             Label targetHint = new Label();
-            targetHint.Location = new Point(14, 98);
+            targetHint.Location = new Point(14, 118);
             targetHint.Size = new Size(442, 16);
             targetHint.ForeColor = SystemColors.GrayText;
             targetHint.Text = "The server must stay non-elevated to access NAS shares.";
 
             grpTargetAutoStart.Controls.Add(chkRestoreConfiguration);
+            grpTargetAutoStart.Controls.Add(chkRestoreRetry);
+            grpTargetAutoStart.Controls.Add(lblRetryEvery);
+            grpTargetAutoStart.Controls.Add(numRestoreRetrySeconds);
+            grpTargetAutoStart.Controls.Add(lblRetrySeconds);
             grpTargetAutoStart.Controls.Add(btnEnableTargetAutoStart);
             grpTargetAutoStart.Controls.Add(btnRemoveTargetAutoStart);
             grpTargetAutoStart.Controls.Add(lblTargetAutoStartState);
@@ -301,7 +341,7 @@ namespace ISCSIConsole
 
             chkMinimizeToTray = new CheckBox();
             chkMinimizeToTray.Text = "Minimize to the notification area when I close the window";
-            chkMinimizeToTray.Location = new Point(14, 296);
+            chkMinimizeToTray.Location = new Point(14, 322);
             chkMinimizeToTray.Size = new Size(470, 17);
             chkMinimizeToTray.CheckedChanged += new EventHandler(OnTargetOptionsChanged);
             tabTarget.Controls.Add(chkMinimizeToTray);
@@ -344,6 +384,9 @@ namespace ISCSIConsole
                 comboIPAddress.SelectedIndex = selectedIndex;
 
                 chkRestoreConfiguration.Checked = m_settings.AutoStart;
+                chkRestoreRetry.Checked = m_settings.RestoreRetry;
+                numRestoreRetrySeconds.Value = AppSettings.ClampRestoreRetrySeconds(m_settings.RestoreRetrySeconds);
+                numRestoreRetrySeconds.Enabled = m_settings.RestoreRetry;
                 chkAutoConnect.Checked = m_settings.AutoConnect;
                 chkInitializeDisk.Checked = m_settings.InitializeIfRaw;
                 chkMinimizeToTray.Checked = m_settings.MinimizeToTray;
@@ -434,6 +477,7 @@ namespace ISCSIConsole
             }
             else
             {
+                CancelRestore();
                 m_server.Stop();
                 lblStatus.Text = String.Empty;
                 m_started = false;
@@ -487,34 +531,236 @@ namespace ISCSIConsole
             if (!m_started && !TryStartServer(false))
             {
                 lblStatus.Text = "Could not start the iSCSI server, the saved target was not restored.";
+                UpdateAutoStartStateLabels();
                 return;
             }
 
+            if (m_restoring)
+            {
+                return;
+            }
+
+            m_restoring = true;
+            m_restoreAttempt = 0;
+            m_restoreCancel = new ManualResetEvent(false);
+
+            string targetName = String.IsNullOrEmpty(m_settings.TargetIQN) ? m_settings.DiskImagePath : m_settings.TargetIQN;
+            lblStatus.Text = "Connecting to target " + targetName + "...";
+
+            Thread thread = new Thread(new ThreadStart(RestoreWorker));
+            thread.IsBackground = true;
+            thread.Name = "iSCSI target restore";
+            thread.Start();
+        }
+
+        private bool RestoreConfigurationBlocking()
+        {
+            if (!m_started && !TryStartServer(false))
+            {
+                lblStatus.Text = "Could not start the iSCSI server, the saved target was not restored.";
+                UpdateAutoStartStateLabels();
+                return false;
+            }
+
+            DiskImage diskImage;
+            string error;
+            ISCSITarget target = OpenSavedTarget(out diskImage, out error);
+            if (target == null)
+            {
+                lblStatus.Text = "Could not restore the saved target: " + error;
+                UpdateAutoStartStateLabels();
+                return false;
+            }
+
+            if (!AddTargetToServer(target, false))
+            {
+                LockUtils.ReleaseDisk(diskImage);
+                lblStatus.Text = "Could not restore the saved target: a target with the same name is already configured.";
+                UpdateAutoStartStateLabels();
+                return false;
+            }
+
+            UpdateUI();
+            lblStatus.Text = "Restored target " + target.TargetName;
+            UpdateInitiatorSummary();
+            UpdateAutoStartStateLabels();
+            return true;
+        }
+
+        private ISCSITarget OpenSavedTarget(out DiskImage diskImage, out string error)
+        {
+            diskImage = null;
+            error = null;
             try
             {
-                DiskImage diskImage = DiskImage.GetDiskImage(m_settings.DiskImagePath, m_settings.ReadOnly);
+                diskImage = DiskImage.GetDiskImage(m_settings.DiskImagePath, m_settings.ReadOnly);
                 if (!diskImage.ExclusiveLock())
                 {
                     throw new IOException("Cannot lock the disk image for exclusive access.");
                 }
 
-                ISCSITarget target = new ISCSITarget(m_settings.TargetIQN, new List<Disk>(new Disk[] { diskImage }));
-                if (!AddTargetToServer(target, false))
-                {
-                    LockUtils.ReleaseDisk(diskImage);
-                    return;
-                }
-
-                UpdateUI();
-                lblStatus.Text = "Restored target " + target.TargetName;
-                UpdateInitiatorSummary();
-                UpdateAutoStartStateLabels();
+                return new ISCSITarget(m_settings.TargetIQN, new List<Disk>(new Disk[] { diskImage }));
             }
             catch (Exception ex)
             {
-                lblStatus.Text = "Could not restore the saved target: " + ex.Message;
-                UpdateAutoStartStateLabels();
+                if (diskImage != null)
+                {
+                    LockUtils.ReleaseDisk(diskImage);
+                    diskImage = null;
+                }
+                error = ex.Message;
+                return null;
             }
+        }
+
+        private void RestoreWorker()
+        {
+            ManualResetEvent cancelEvent = m_restoreCancel;
+            while (true)
+            {
+                int attempt = Interlocked.Increment(ref m_restoreAttempt);
+                DiskImage diskImage;
+                string error;
+                ISCSITarget target = OpenSavedTarget(out diskImage, out error);
+
+                if (target != null)
+                {
+                    bool added = false;
+                    bool cancelled = false;
+                    string failure = null;
+                    try
+                    {
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            if (cancelEvent.WaitOne(0))
+                            {
+                                cancelled = true;
+                                return;
+                            }
+
+                            if (AddTargetToServer(target, false))
+                            {
+                                added = true;
+                                m_restoring = false;
+                                UpdateUI();
+                                lblStatus.Text = "Restored target " + target.TargetName;
+                                UpdateInitiatorSummary();
+                                UpdateAutoStartStateLabels();
+                                if (m_options.AutoConnect && m_targets.Count > 0)
+                                {
+                                    ConnectWindowsAsync(false);
+                                }
+                            }
+                            else
+                            {
+                                m_restoring = false;
+                                failure = "a target with the same name is already configured.";
+                                lblStatus.Text = "Could not restore the saved target: " + failure;
+                                UpdateAutoStartStateLabels();
+                            }
+                        });
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        cancelled = true;
+                    }
+
+                    if (!added)
+                    {
+                        LockUtils.ReleaseDisk(diskImage);
+                    }
+
+                    if (added || cancelled)
+                    {
+                        return;
+                    }
+
+                    if (!String.IsNullOrEmpty(failure))
+                    {
+                        return;
+                    }
+                }
+
+                if (cancelEvent.WaitOne(0))
+                {
+                    return;
+                }
+
+                if (!m_settings.RestoreRetry)
+                {
+                    ReportRestoreFailure(error, cancelEvent);
+                    return;
+                }
+
+                int interval = AppSettings.ClampRestoreRetrySeconds(m_settings.RestoreRetrySeconds);
+                for (int remaining = interval; remaining > 0; remaining--)
+                {
+                    int secondsLeft = remaining;
+                    string message = String.Format("Connecting to target (attempt {0}): retry in {1} s. {2}", attempt, secondsLeft, Shorten(error, 90));
+                    try
+                    {
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            if (!cancelEvent.WaitOne(0))
+                            {
+                                lblStatus.Text = message;
+                            }
+                        });
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        return;
+                    }
+
+                    if (cancelEvent.WaitOne(1000))
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void ReportRestoreFailure(string error, ManualResetEvent cancelEvent)
+        {
+            try
+            {
+                this.Invoke((MethodInvoker)delegate
+                {
+                    if (cancelEvent.WaitOne(0))
+                    {
+                        return;
+                    }
+                    m_restoring = false;
+                    lblStatus.Text = "Could not restore the saved target: " + error;
+                    UpdateAutoStartStateLabels();
+                });
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        private void CancelRestore()
+        {
+            if (m_restoreCancel != null)
+            {
+                m_restoreCancel.Set();
+            }
+            m_restoring = false;
+        }
+
+        private static string Shorten(string text, int maxLength)
+        {
+            if (String.IsNullOrEmpty(text))
+            {
+                return String.Empty;
+            }
+            text = text.Replace("\r", " ").Replace("\n", " ");
+            if (text.Length <= maxLength)
+            {
+                return text;
+            }
+            return text.Substring(0, maxLength - 3) + "...";
         }
 
         private void btnAddTarget_Click(object sender, EventArgs e)
@@ -523,6 +769,7 @@ namespace ISCSIConsole
             DialogResult addTargetResult = addTarget.ShowDialog();
             if (addTargetResult == DialogResult.OK)
             {
+                CancelRestore();
                 ISCSITarget target = addTarget.Target;
                 if (!AddTargetToServer(target, true))
                 {
@@ -607,7 +854,7 @@ namespace ISCSIConsole
 
             if (m_targets.Count == 0 && !String.IsNullOrEmpty(m_settings.DiskImagePath))
             {
-                RestoreConfiguration();
+                RestoreConfigurationBlocking();
             }
             if (m_targets.Count == 0)
             {
@@ -963,6 +1210,9 @@ namespace ISCSIConsole
                 return;
             }
             m_settings.AutoStart = chkRestoreConfiguration.Checked;
+            m_settings.RestoreRetry = chkRestoreRetry.Checked;
+            numRestoreRetrySeconds.Enabled = chkRestoreRetry.Checked;
+            m_settings.RestoreRetrySeconds = AppSettings.ClampRestoreRetrySeconds((int)numRestoreRetrySeconds.Value);
             if (m_settings.MinimizeToTray != chkMinimizeToTray.Checked)
             {
                 // Changing the option by hand counts as an answer to the close prompt.
@@ -1089,6 +1339,7 @@ namespace ISCSIConsole
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
+            CancelRestore();
             if (m_trayIcon != null)
             {
                 m_trayIcon.Visible = false;
@@ -1192,6 +1443,8 @@ namespace ISCSIConsole
             }
 
             m_settings.AutoStart = chkRestoreConfiguration.Checked;
+            m_settings.RestoreRetry = chkRestoreRetry.Checked;
+            m_settings.RestoreRetrySeconds = AppSettings.ClampRestoreRetrySeconds((int)numRestoreRetrySeconds.Value);
             m_settings.AutoConnect = chkAutoConnect.Checked;
             m_settings.InitializeIfRaw = chkInitializeDisk.Checked;
             m_settings.MinimizeToTray = chkMinimizeToTray.Checked;

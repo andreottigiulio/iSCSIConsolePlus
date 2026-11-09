@@ -16,6 +16,10 @@ own initiator on the same PC. The additions are:
 * Two tabs, Target (Server) and Windows Initiator (Client), with two independent
   auto-starts: a Startup shortcut for the target and a highest-privilege logon
   task for the initiator.
+* A non-blocking target restore at startup: the window is usable immediately,
+  the status bar reports "Connecting to target ...", and if the VHD is not
+  available yet the app retries every N seconds (persisted as `RestoreRetry`
+  and `RestoreRetrySeconds`, configurable in the Target tab).
 * A short-lived elevated helper for MSiSCSI and disk operations, while the
   process serving the VHD stays non-elevated (an elevated token cannot see the
   user's SMB session).
